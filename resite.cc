@@ -24,6 +24,10 @@ KSEQ_INIT(gzFile, gzread)
 
 int main(int argc, char *argv[])
 {
+    if (argc < 2) {
+        cerr << "USAGE: resite FASTQ ...\n";
+        return EXIT_FAILURE;
+    }
     unordered_map<string, size_t> mainhist;
     #pragma omp parallel for schedule(dynamic) shared(mainhist)
     for (int i = 1; i < argc; i++) {
@@ -46,8 +50,9 @@ int main(int argc, char *argv[])
             }
             string re(seq->seq.s, RESITE);
             hist[re] += 1;
-            if (nread %10000 == 0) {
+            if (nread % 50000 == 0) {
                 fprintf(stderr, ".");
+                fflush(stderr);
             }
         }
         kseq_destroy(seq);
