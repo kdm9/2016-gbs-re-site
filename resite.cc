@@ -7,11 +7,14 @@
 
 #include <iostream>
 #include <string>
-#include <omp.h>
+#ifdef _OPENMP
+#   include <omp.h>
+#endif
 #include <unordered_map>
 #include <cstdio>
 #include <kseq.h>
 #include <zlib.h>
+#include <getopt.h>
 
 using std::unordered_map;
 using std::string;
@@ -20,17 +23,40 @@ using std::cerr;
 
 KSEQ_INIT(gzFile, gzread)
 
-#define RESITE 5 // 5 bp from start of read
+int usage()
+{
+    cerr << "USAGE: resite -l LEN FASTQ ...\n";
+    exit(EXIT_FAILURE);
+}
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2) {
-        cerr << "USAGE: resite FASTQ ...\n";
-        return EXIT_FAILURE;
+    ssize_t resite_len = 0;
+    int c;
+    while ((c = getopt(argc, argv, "l:")) > 0) {
+        switch (c) {
+            case 'l':
+                resite_len = atoi(optarg);
+                break;
+            default:
+                cerr << "bad arg " << optopt << "\n";
+                usage();
+                break;
+        }
     }
+
+    if (resite_len < 1 || resite_len > 100) {
+        cerr << "Bad RE site length " << resite_len << "\n";
+        usage();
+    }
+    if (optind == argc) {
+        cerr << "Too few read files\n";
+        usage();
+    }
+
     unordered_map<string, size_t> mainhist;
     #pragma omp parallel for schedule(dynamic) shared(mainhist)
-    for (int i = 1; i < argc; i++) {
+    for (int i = optind; i < argc; i++) {
         unordered_map<string, size_t> hist;
         const char *filename = argv[i];
         gzFile fp = gzopen(filename, "r");
@@ -40,15 +66,15 @@ int main(int argc, char *argv[])
         size_t nread = 0;
         #pragma omp critical
         {
-            fprintf(stderr, "Starting %s\n", filename);
+            fprintf(stderr, "Starting %s (%d of %d)\n", filename, i - optind + 1, argc - optind);
         }
         while ((seql = kseq_read(seq)) > 0) {
             nread++;
-            if (seql < RESITE) {
+            if (seql < resite_len) {
                 skipped++;
                 continue;
             }
-            string re(seq->seq.s, RESITE);
+            string re(seq->seq.s, resite_len);
             hist[re] += 1;
             if (nread % 50000 == 0) {
                 fprintf(stderr, ".");

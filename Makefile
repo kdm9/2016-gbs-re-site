@@ -4,7 +4,7 @@ LDFLAGS = -lz -lm
 .PHONY: all
 all: resite
 
-resite: CXXFLAGS += -fopenmp 
+#resite: CXXFLAGS += -fopenmp 
 
 %: %.cc | kseq.h
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
